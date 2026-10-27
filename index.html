@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#2e5bff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Klippbok">
+<title>Klippbok</title>
+<link rel="manifest" id="manifest">
+<link rel="icon" id="favicon">
+<link rel="apple-touch-icon" id="touchicon">
+<style>
+:root{
+  --bg:#eaeef3; --card:#ffffff; --ink:#162033; --mute:#66748a; --line:#d5dce6;
+  --acc:#2e5bff; --acc-ink:#ffffff; --danger:#c8322b; --spine-none:#c2cbd8;
+  --pill-l:34%; --pill-a:.14; --shadow:0 1px 0 rgba(22,32,51,.04),0 6px 18px -10px rgba(22,32,51,.25);
+  --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif;
+  --sans:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0f141b; --card:#182029; --ink:#e8edf4; --mute:#8c9aae; --line:#27313e;
+    --acc:#7592ff; --acc-ink:#0b1020; --danger:#ff7a72; --spine-none:#3a4658;
+    --pill-l:76%; --pill-a:.2; --shadow:none;
+  }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html{background:var(--bg)}
+body{margin:0;font:16px/1.4 var(--sans);color:var(--ink);background:var(--bg);min-height:100dvh;padding-bottom:calc(90px + env(safe-area-inset-bottom))}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+
+/* Header */
+.top{position:sticky;top:0;z-index:20;background:var(--bg);padding:calc(10px + env(safe-area-inset-top)) 14px 8px;border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+h1{font:700 26px/1 var(--serif);letter-spacing:-.01em;margin:0}
+.count{color:var(--mute);font-size:14px;margin-left:2px}
+.sp{flex:1}
+.btn{min-height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-weight:600}
+.btn.sm{min-height:40px;padding:0 14px}
+.btn.primary{background:var(--acc);color:var(--acc-ink);border-color:transparent}
+.btn.danger{color:var(--danger)}
+.btn.wide{width:100%;display:flex;align-items:center;justify-content:center;text-decoration:none;gap:8px}
+.icon{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;padding:0}
+.icon svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.icon.on{background:var(--ink);color:var(--bg);border-color:transparent}
+#q{width:100%;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);padding:0 14px;margin-bottom:8px}
+.chips.scroll{display:flex;gap:8px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
+.chips.scroll::-webkit-scrollbar{display:none}
+.chip{flex:none;min-height:38px;padding:0 14px;border-radius:19px;border:1px solid var(--line);background:var(--card);display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:14px}
+.chip small{font-weight:500;color:var(--mute);font-size:12px}
+.chip.active{background:var(--ink);color:var(--bg);border-color:transparent}
+.chip.active small{color:inherit;opacity:.7}
+.chip[style]{--c:hsl(var(--h) 62% 48%)}
+.chip[style]::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--c)}
+.chip.on[style]{background:var(--c);color:#fff;border-color:transparent}
+.chip.on[style]::before{background:#fff}
+.chip.some[style]{border:2px dashed var(--c)}
+.wrap{display:flex;flex-wrap:wrap;gap:8px}
+.filters{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.filters select{height:40px;border-radius:10px;border:1px solid var(--line);background:var(--card);padding:0 8px;font-size:14px;min-width:0}
+
+/* List */
+main{padding:12px 14px;max-width:760px;margin:0 auto}
+.banner{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:12px}
+.banner p{margin:0;flex:1;font-size:15px}
+.card{position:relative;display:block;background:var(--card);border-radius:14px;box-shadow:var(--shadow);margin-bottom:10px;overflow:hidden;content-visibility:auto;contain-intrinsic-size:auto 96px;border:1px solid var(--line)}
+.crow{display:flex;align-items:stretch}
+.spine{flex:none;width:8px;background:var(--spine-none)}
+.card .main{flex:1;min-width:0;padding:11px 8px 11px 12px;cursor:pointer}
+.row1{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.badge{font-size:12px;font-weight:700;padding:2px 8px;border-radius:6px;background:var(--bg);color:var(--mute)}
+.user{border:0;background:none;padding:0;font-weight:700;font-size:16px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+time{color:var(--mute);font-size:13px;margin-left:auto}
+.note{margin:6px 0 0;font-size:15px;line-height:1.35;color:var(--ink);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.note.none{color:var(--mute);font-style:italic;font-size:14px}
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.pill{font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:10px;background:hsl(var(--h) 70% 50% / var(--pill-a));color:hsl(var(--h) 60% var(--pill-l))}
+.unsorted{font-size:12.5px;color:var(--mute);font-style:italic}
+.side{flex:none;width:52px;display:flex;flex-direction:column;border-left:1px solid var(--line)}
+.side>*{flex:1;min-height:44px;display:grid;place-items:center;color:var(--acc);text-decoration:none;border:0;background:none;padding:0}
+.side>*+*{border-top:1px solid var(--line)}
+.side .prev.on{background:var(--bg)}
+.side svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.embed{border-top:1px solid var(--line);padding:10px;background:var(--bg)}
+.embed iframe{display:block;width:100%;max-width:540px;height:560px;margin:0 auto;border:0;border-radius:10px;background:var(--card)}
+.embednote{margin:8px 0 0;font-size:12.5px;color:var(--mute);text-align:center}
+.card.done{opacity:.55}
+.card.done .user{text-decoration:line-through}
+.check{flex:none;width:26px;height:26px;border-radius:8px;border:2px solid var(--mute);margin:auto 0 auto 10px}
+.check.on{background:var(--acc);border-color:var(--acc);box-shadow:inset 0 0 0 4px var(--card)}
+.more{text-align:center;margin:14px 0}
+.empty{text-align:center;padding:34px 10px}
+.empty h2{font:700 24px/1.15 var(--serif);margin:0 0 8px}
+.empty p{color:var(--mute);margin:0 auto 18px;max-width:34ch}
+
+/* Select bar */
+.selbar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--ink);color:var(--bg);padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;align-items:center}
+.selbar span{flex:1;font-weight:600}
+.selbar .btn{background:transparent;color:inherit;border-color:rgba(127,127,127,.5);min-height:40px;padding:0 12px}
+.selbar .btn.primary{background:var(--acc);color:var(--acc-ink)}
+
+/* Dialogs */
+dialog{border:0;padding:0;margin:0;position:fixed;top:auto;bottom:0;left:0;right:0;width:100%;max-width:100%;max-height:100dvh;background:transparent;color:var(--ink);overflow:visible}
+dialog::backdrop{background:rgba(8,12,20,.55)}
+dialog .in{background:var(--card);border-radius:22px 22px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom));max-height:90dvh;overflow:auto;max-width:640px;margin:0 auto;overscroll-behavior:contain}
+dialog.tall .in{min-height:70dvh}
+dialog[open] .in{animation:rise .18s ease-out}
+@keyframes rise{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){dialog[open] .in{animation:none}}
+.sheet-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.sheet-head h2{font:700 22px/1.1 var(--serif);margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.x{width:40px;height:40px;border-radius:10px;border:0;background:var(--bg);font-size:18px}
+h3{font:700 15px/1.2 var(--sans);margin:18px 0 8px}
+.meta{margin:0 0 12px;color:var(--mute);font-size:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.addcat{display:flex;gap:8px;margin-top:10px}
+.addcat input,textarea{flex:1;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:10px 12px;min-width:0}
+textarea{width:100%;resize:vertical}
+.check-row{display:flex;align-items:center;gap:10px;margin:12px 0;min-height:36px}
+.check-row input{width:22px;height:22px;accent-color:var(--acc)}
+.actions{display:flex;gap:10px;justify-content:space-between;margin-top:18px}
+.actions .primary{flex:1}
+.log{margin:12px 0 0;padding:12px;background:var(--bg);border-radius:12px;font-size:14px;max-height:220px;overflow:auto;white-space:pre-wrap}
+.log:empty{display:none}
+details{background:var(--bg);border-radius:12px;padding:10px 14px;margin:0 0 14px}
+summary{font-weight:600;cursor:pointer;min-height:28px}
+details ol{margin:8px 0 4px;padding-left:20px;font-size:14px}
+details li{margin-bottom:4px}
+.filebtn{display:block;border:2px dashed var(--line);border-radius:14px;padding:22px 14px;text-align:center;font-weight:600;cursor:pointer}
+.filebtn small{display:block;color:var(--mute);font-weight:400;margin-top:4px}
+.filebtn input{display:none}
+.menu-list{display:grid;gap:8px;margin-top:10px}
+.menu-list .btn{text-align:left;justify-content:flex-start}
+.catrow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.catrow input{flex:1;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:10px 12px;min-width:0}
+.catrow .n{color:var(--mute);font-size:13px;min-width:28px;text-align:right}
+.sortprog{height:6px;background:var(--bg);border-radius:3px;overflow:hidden;margin:6px 0 14px}
+.sortprog i{display:block;height:100%;background:var(--acc)}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;z-index:100;max-width:88vw;text-align:center}
+.pad{height:8px}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="bar">
+    <h1>Klippbok</h1><span class="count" id="count"></span>
+    <div class="sp"></div>
+    <button class="icon" id="btnSelect" aria-label="Markera flera"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.5l2.4 2.4 4.6-5"/></svg></button>
+    <button class="btn primary sm" id="btnImport">Importera</button>
+    <button class="icon" id="btnMenu" aria-label="Meny"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+  </div>
+  <input id="q" type="search" placeholder="Sök konto, anteckning eller kategori" autocomplete="off">
+  <div id="chips" class="chips scroll"></div>
+  <div class="filters">
+    <select id="fSort" aria-label="Sortera"><option value="new">Senast sparade</option><option value="old">Äldst först</option><option value="user">Konto A–Ö</option></select>
+    <select id="fType" aria-label="Typ"><option value="all">Alla typer</option><option value="reel">Reels</option><option value="post">Inlägg</option></select>
+    <select id="fStatus" aria-label="Status"><option value="all">Alla</option><option value="open">Ej klara</option><option value="done">Klara</option></select>
+  </div>
+</header>
+
+<main>
+  <div id="banner"></div>
+  <div id="list"></div>
+  <div id="more" class="more" hidden></div>
+</main>
+
+<div class="selbar" id="selbar" hidden>
+  <span id="selcount">0 valda</span>
+  <button class="btn" id="selAll">Alla</button>
+  <button class="btn primary" id="selCat">Kategorisera</button>
+  <button class="btn" id="selCancel">Avbryt</button>
+</div>
+
+<dialog id="dItem"><div class="in" id="itemIn"></div></dialog>
+<dialog id="dSort" class="tall"><div class="in" id="sortIn"></div></dialog>
+
+<dialog id="dImport"><div class="in">
+  <div class="sheet-head"><h2>Importera</h2><button class="x" data-close aria-label="Stäng">✕</button></div>
+  <details>
+    <summary>Så hämtar du din export från Instagram</summary>
+    <ol>
+      <li>Öppna Instagram, gå till din profil och menyn och välj Kontocenter.</li>
+      <li>Välj Din information och behörigheter, sedan Exportera din information.</li>
+      <li>Skapa en export till enheten och anpassa informationen så att bara Sparat är markerat.</li>
+      <li>Välj formatet JSON och datumintervallet Hela tiden.</li>
+      <li>När filen är klar laddar du ner zip-filen och väljer den här nedan. Du behöver inte packa upp den.</li>
+    </ol>
+    <p style="font-size:13px;color:var(--mute);margin:6px 0 2px">Menynamnen kan skilja något mellan Instagram-versioner.</p>
+  </details>
+  <label class="filebtn">Välj fil från exporten
+    <small>zip, json eller html, flera filer går bra</small>
+    <input type="file" id="fileIn" multiple accept=".zip,.json,.html,.htm,application/zip,application/json,text/html">
+  </label>
+  <label class="check-row"><input type="checkbox" id="optCols" checked> Skapa kategorier från mina Instagram-samlingar</label>
+  <h3>Eller klistra in länkar</h3>
+  <textarea id="pasteIn" rows="3" placeholder="Klistra in en eller flera Instagram-länkar"></textarea>
+  <div class="actions"><button class="btn" id="pasteBtn">Lägg till länkar</button><button class="btn primary" data-close>Klar</button></div>
+  <div class="log" id="log" role="status"></div>
+</div></dialog>
+
+<dialog id="dMenu"><div class="in">
+  <div class="sheet-head"><h2>Meny</h2><button class="x" data-close aria-label="Stäng">✕</button></div>
+  <div class="menu-list">
+    <button class="btn" id="mSort">Sortera osorterade</button>
+    <button class="btn" id="mCats">Hantera kategorier</button>
+    <button class="btn" id="mBackup">Spara säkerhetskopia</button>
+    <label class="btn" style="display:flex;align-items:center;cursor:pointer">Återställ säkerhetskopia<input type="file" id="restoreIn" accept=".json,application/json" hidden></label>
+    <button class="btn danger" id="mClear">Rensa allt</button>
+  </div>
+  <p style="color:var(--mute);font-size:13px;margin:16px 0 0">All data sparas bara i den här webbläsaren. Spara en säkerhetskopia då och då.</p>
+</div></dialog>
+
+<dialog id="dCats"><div class="in" id="catsIn"></div></dialog>
+
+<div id="toast" class="toast" hidden></div>
+
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const DEFAULT_CATS=['Mat och recept','Tech och prylar','Musik','DIY och bygg','Inspiration','Titta senare'];
+const S={items:[],map:new Map(),cats:[],q:'',cat:'all',type:'all',status:'all',sort:'new',limit:80,select:false,sel:new Set(),dlg:[],queue:[],qi:0,auto:true,preview:null,dlgPrev:false,sortPrev:false};
+let db=null;
+
+/* ---------- Lagring (IndexedDB) ---------- */
+function openDB(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open('klippbok',1);
+    r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('items',{keyPath:'id'});d.createObjectStore('meta');};
+    r.onsuccess=()=>res(r.result);
+    r.onerror=()=>rej(r.error);
+  });
+}
+const rq=r=>new Promise((res,rej)=>{r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});
+function write(store,fn){
+  if(!db) return Promise.resolve();
+  return new Promise((res,rej)=>{
+    const t=db.transaction(store,'readwrite');
+    fn(t.objectStore(store));
+    t.oncomplete=()=>res();
+    t.onerror=()=>rej(t.error);
+  });
+}
+const putItems=list=>write('items',s=>list.forEach(i=>s.put(i)));
+const delItems=ids=>write('items',s=>ids.forEach(i=>s.delete(i)));
+const clearItems=()=>write('items',s=>s.clear());
+const saveCats=()=>write('meta',s=>s.put(S.cats,'cats'));
+async function loadAll(){
+  try{db=await openDB();}catch(e){db=null;toast('Lagringen är inte tillgänglig, ändringar sparas inte');}
+  if(db){
+    S.items=await rq(db.transaction('items').objectStore('items').getAll());
+    const c=await rq(db.transaction('meta').objectStore('meta').get('cats'));
+    S.cats=Array.isArray(c)?c:DEFAULT_CATS.slice();
+    if(!c) await saveCats();
+  }else S.cats=DEFAULT_CATS.slice();
+  S.items.forEach(i=>{i.cats=i.cats||[];i.note=i.note||'';});
+  rebuildMap();
+  try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist();}catch(e){}
+}
+function rebuildMap(){S.map=new Map(S.items.map(i=>[i.id,i]));}
+
+/* ---------- Hjälpare ---------- */
+let toastT;
+function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3200);}
+const hue=n=>{let h=0;for(const c of String(n))h=(h*31+c.charCodeAt(0))%360;return h;};
+const fmt=ms=>ms?new Date(ms).toLocaleDateString('sv-SE',{day:'numeric',month:'short',year:'numeric'}):'';
+const dateOf=i=>i.savedAt||i.addedAt||0;
+const typeName=t=>t==='reel'?'Reel':'Inlägg';
+const OPEN_SVG='<svg viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';
+const EYE_SVG='<svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const embedHtml=i=>`<div class="embed"><iframe src="${esc(i.url)}embed/captioned/" loading="lazy" allowfullscreen title="Förhandsvisning från Instagram"></iframe><p class="embednote">Hämtas från Instagram och kräver internet. Privata konton visas inte.</p></div>`;
+const pill=c=>`<span class="pill" style="--h:${hue(c)}">${esc(c)}</span>`;
+
+/* ---------- Tolkning av Instagram-export ---------- */
+const LINK=/instagram\.com\/(?:([A-Za-z0-9_.]+)\/)?(p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i;
+function fixStr(s){
+  if(typeof s!=='string'||!/[\u00c2-\u00f4]/.test(s)) return s;
+  try{
+    const b=Uint8Array.from(s,c=>{const n=c.charCodeAt(0);if(n>255)throw 0;return n;});
+    return new TextDecoder('utf-8',{fatal:true}).decode(b);
+  }catch(e){return s;}
+}
+function mkFromLink(str){
+  const m=LINK.exec(str||'');if(!m)return null;
+  const kind=m[2].toLowerCase();
+  const u=m[1]&&!/^(p|reel|reels|tv|share|accounts)$/i.test(m[1])?m[1]:'';
+  return {id:m[3],type:kind==='p'?'post':'reel',user:u,url:`https://www.instagram.com/${kind==='p'?'p':'reel'}/${m[3]}/`,savedAt:null,cols:[]};
+}
+function addFound(map,it){
+  const ex=map.get(it.id);
+  if(!ex){map.set(it.id,it);return;}
+  if(!ex.user&&it.user)ex.user=it.user;
+  if(!ex.savedAt&&it.savedAt)ex.savedAt=it.savedAt;
+  it.cols.forEach(c=>{if(!ex.cols.includes(c))ex.cols.push(c);});
+}
+function extract(node){
+  const r={link:null,ts:null,userGuess:null};
+  (function rec(o,key){
+    if(typeof o==='string'){if(!r.link&&LINK.test(o))r.link=o;return;}
+    if(typeof o==='number'){if(key==='timestamp'&&!r.ts)r.ts=o;return;}
+    if(Array.isArray(o)){o.forEach(x=>rec(x,key));return;}
+    if(o&&typeof o==='object'){
+      if(typeof o.href==='string'&&LINK.test(o.href)&&typeof o.value==='string'&&o.value&&!LINK.test(o.value)&&!r.userGuess)r.userGuess=o.value;
+      for(const k of Object.keys(o))rec(o[k],k);
+    }
+  })(node,'');
+  return r;
+}
+function walkJson(node,found,st){
+  if(Array.isArray(node)){node.forEach(n=>walkJson(n,found,st));return;}
+  if(!node||typeof node!=='object')return;
+  if(node.string_map_data||node.label_values){
+    const r=extract(node);
+    if(!r.link){
+      const smd=node.string_map_data||{};
+      const nm=Object.entries(smd).find(([k,v])=>/^(name|namn)$/i.test(k)&&v&&typeof v.value==='string'&&v.value);
+      if(nm)st.collection=fixStr(nm[1].value);
+      return;
+    }
+    const it=mkFromLink(r.link);
+    let user=typeof node.title==='string'?node.title.trim():'';
+    if(/^(collection|collections|samling|samlingar)$/i.test(user))user='';
+    if(!user&&r.userGuess)user=r.userGuess;
+    if(!user&&Array.isArray(node.label_values)){
+      const lv=node.label_values.find(x=>x&&/anv|user|owner|namn|name/i.test(x.label||'')&&typeof x.value==='string'&&x.value&&!LINK.test(x.value));
+      if(lv)user=lv.value;
+    }
+    it.user=fixStr(user)||it.user;
+    it.savedAt=r.ts?(r.ts<1e12?r.ts*1000:r.ts):null;
+    if(st.collection)it.cols=[st.collection];
+    addFound(found,it);
+    return;
+  }
+  for(const k of Object.keys(node))walkJson(node[k],found,st);
+}
+function parseHtml(text,found){
+  const doc=new DOMParser().parseFromString(text,'text/html');
+  doc.querySelectorAll('a[href]').forEach(a=>{
+    const it=mkFromLink(a.getAttribute('href'));if(!it)return;
+    const box=a.closest('.pam')||(a.parentElement&&a.parentElement.parentElement&&a.parentElement.parentElement.parentElement);
+    const u=box&&box.querySelector('._a6-h');
+    if(u&&u.textContent.trim())it.user=u.textContent.trim();
+    if(box){const ds=box.querySelectorAll('div');const t=ds.length?ds[ds.length-1].textContent:'';const p=Date.parse(t);if(!isNaN(p))it.savedAt=p;}
+    addFound(found,it);
+  });
+}
+function parseText(name,text,found){
+  const t=text.trim();
+  if(/\.html?$/i.test(name)||t.startsWith('<')){parseHtml(text,found);return;}
+  walkJson(JSON.parse(text),found,{collection:null});
+}
+
+/* ---------- Zip-läsare (utan bibliotek) ---------- */
+async function readZip(file){
+  const size=file.size,tailLen=Math.min(size,65557+22);
+  const tail=new DataView(await file.slice(size-tailLen,size).arrayBuffer());
+  let e=-1;
+  for(let i=tailLen-22;i>=0;i--){if(tail.getUint32(i,true)===0x06054b50){e=i;break;}}
+  if(e<0)throw new Error('Det här verkar inte vara en giltig zip-fil');
+  let cdSize=tail.getUint32(e+12,true),cdOff=tail.getUint32(e+16,true);
+  if(cdOff===0xFFFFFFFF||cdSize===0xFFFFFFFF){
+    const loc=e-20;
+    if(loc>=0&&tail.getUint32(loc,true)===0x07064b50){
+      const off=Number(tail.getBigUint64(loc+8,true));
+      const z=new DataView(await file.slice(off,off+56).arrayBuffer());
+      if(z.getUint32(0,true)===0x06064b50){cdSize=Number(z.getBigUint64(40,true));cdOff=Number(z.getBigUint64(48,true));}
+    }
+  }
+  const cd=new DataView(await file.slice(cdOff,cdOff+cdSize).arrayBuffer());
+  const dec=new TextDecoder(),entries=[];
+  let p=0;
+  while(p+46<=cd.byteLength&&cd.getUint32(p,true)===0x02014b50){
+    const method=cd.getUint16(p+10,true);
+    let csize=cd.getUint32(p+20,true),usize=cd.getUint32(p+24,true);
+    const nlen=cd.getUint16(p+28,true),elen=cd.getUint16(p+30,true),clen=cd.getUint16(p+32,true);
+    let off=cd.getUint32(p+42,true);
+    const name=dec.decode(new Uint8Array(cd.buffer,p+46,nlen));
+    if(csize===0xFFFFFFFF||usize===0xFFFFFFFF||off===0xFFFFFFFF){
+      let q=p+46+nlen;const end=q+elen;
+      while(q+4<=end){
+        const id=cd.getUint16(q,true),sz=cd.getUint16(q+2,true);
+        if(id===1){
+          let r=q+4;
+          if(usize===0xFFFFFFFF){usize=Number(cd.getBigUint64(r,true));r+=8;}
+          if(csize===0xFFFFFFFF){csize=Number(cd.getBigUint64(r,true));r+=8;}
+          if(off===0xFFFFFFFF){off=Number(cd.getBigUint64(r,true));}
+        }
+        q+=4+sz;
+      }
+    }
+    entries.push({name,method,csize,usize,off});
+    p+=46+nlen+elen+clen;
+  }
+  return entries;
+}
+async function readEntry(file,e){
+  const h=new DataView(await file.slice(e.off,e.off+30).arrayBuffer());
+  const start=e.off+30+h.getUint16(26,true)+h.getUint16(28,true);
+  const blob=file.slice(start,start+e.csize);
+  if(e.method===0)return blob.text();
+  if(e.method===8){
+    if(typeof DecompressionStream==='undefined')throw new Error('Webbläsaren kan inte packa upp zip. Packa upp filen själv och välj json-filerna.');
+    return new Response(blob.stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+  }
+  throw new Error('Komprimeringen i zip-filen stöds inte');
+}
+const isSavedEntry=e=>e.usize>0&&/(^|\/)[^/]*saved[^/]*\.(json|html?)$/i.test(e.name)||e.usize>0&&/(^|\/)saved\/[^/]+\.(json|html?)$/i.test(e.name);
+
+/* ---------- Import ---------- */
+const logEl=()=>$('log');
+function log(m){const l=logEl();l.textContent+=(l.textContent?'\n':'')+m;l.scrollTop=l.scrollHeight;}
+async function importFiles(files){
+  logEl().textContent='';
+  const found=new Map();
+  for(const f of files){
+    try{
+      if(/\.zip$/i.test(f.name)){
+        log(`Läser ${f.name}`);
+        const cand=(await readZip(f)).filter(isSavedEntry);
+        if(!cand.length){log('Hittade inga filer för sparade inlägg i zip-filen. Kontrollera att Sparat var valt vid exporten.');continue;}
+        for(const e of cand){
+          const before=found.size;
+          parseText(e.name,await readEntry(f,e),found);
+          log(`${e.name.split('/').pop()}: ${found.size-before} nya länkar`);
+        }
+      }else{
+        const before=found.size;
+        parseText(f.name,await f.text(),found);
+        log(`${f.name}: ${found.size-before} nya länkar`);
+      }
+    }catch(err){log(`Kunde inte läsa ${f.name}: ${err.message||err}`);}
+  }
+  await mergeFound(found,$('optCols').checked);
+}
+async function mergeFound(found,useCols){
+  if(!found.size){log('Inga sparade klipp hittades.');return;}
+  let added=0,updated=0,newCats=0;const put=[];
+  for(const it of found.values()){
+    const cats=[];
+    if(useCols)it.cols.forEach(c=>{if(!S.cats.includes(c)){S.cats.push(c);newCats++;}cats.push(c);});
+    const ex=S.map.get(it.id);
+    if(ex){
+      let ch=false;
+      cats.forEach(c=>{if(!ex.cats.includes(c)){ex.cats.push(c);ch=true;}});
+      if(!ex.user&&it.user){ex.user=it.user;ch=true;}
+      if(!ex.savedAt&&it.savedAt){ex.savedAt=it.savedAt;ch=true;}
+      if(ch){put.push(ex);updated++;}
+    }else{
+      const n={id:it.id,type:it.type,url:it.url,user:it.user,savedAt:it.savedAt,addedAt:Date.now(),cats,note:'',done:false};
+      S.items.push(n);S.map.set(n.id,n);put.push(n);added++;
+    }
+  }
+  await putItems(put);
+  if(newCats)await saveCats();
+  log(`Klart. ${found.size} klipp hittades: ${added} nya, ${found.size-added-updated} fanns redan${updated?`, ${updated} uppdaterades`:''}.${newCats?` ${newCats} kategorier skapades från samlingar.`:''}`);
+  renderAll();
+}
+async function addPasted(){
+  const links=($('pasteIn').value.match(/https?:\/\/(?:www\.)?instagram\.com\/[^\s"'<>)]+/gi)||[]);
+  const found=new Map();
+  links.forEach(l=>{const it=mkFromLink(l);if(it)addFound(found,it);});
+  logEl().textContent='';
+  if(!found.size){log('Hittade inga Instagram-länkar till inlägg eller reels.');return;}
+  await mergeFound(found,false);
+  $('pasteIn').value='';
+}
+
+/* ---------- Filtrera och sortera ---------- */
+function sortFn(a,b){
+  if(S.sort==='old')return dateOf(a)-dateOf(b);
+  if(S.sort==='user')return (a.user||'').localeCompare(b.user||'','sv')||dateOf(b)-dateOf(a);
+  return dateOf(b)-dateOf(a);
+}
+function visible(){
+  const words=S.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return S.items.filter(i=>{
+    if(S.cat==='__none'){if(i.cats.length)return false;}
+    else if(S.cat!=='all'&&!i.cats.includes(S.cat))return false;
+    if(S.type!=='all'&&i.type!==S.type)return false;
+    if(S.status==='open'&&i.done)return false;
+    if(S.status==='done'&&!i.done)return false;
+    if(words.length){
+      const h=(i.user+' '+i.note+' '+i.cats.join(' ')+' '+i.id).toLowerCase();
+      if(!words.every(w=>h.includes(w)))return false;
+    }
+    return true;
+  }).sort(sortFn);
+}
+
+/* ---------- Rendering ---------- */
+function renderChips(){
+  const cnt={},none=S.items.filter(i=>!i.cats.length).length;
+  S.items.forEach(i=>i.cats.forEach(c=>cnt[c]=(cnt[c]||0)+1));
+  const chip=(v,label,n,h)=>`<button class="chip${S.cat===v?' active':''}" data-cat="${esc(v)}"${h!=null?` style="--h:${h}"`:''}>${esc(label)} <small>${n}</small></button>`;
+  let h=chip('all','Alla',S.items.length)+chip('__none','Osorterade',none);
+  S.cats.forEach(c=>{h+=chip(c,c,cnt[c]||0,hue(c));});
+  $('chips').innerHTML=h;
+}
+function renderBanner(){
+  const none=S.items.filter(i=>!i.cats.length).length;
+  let h='';
+  if(S.items.length&&none)h=`<div class="banner"><p>${none} ${none===1?'klipp saknar':'klipp saknar'} kategori</p><button class="btn primary sm" id="bannerSort">Börja sortera</button></div>`;
+  $('banner').innerHTML=h;
+}
+function card(i){
+  const first=i.cats[0];
+  const spine=first?`hsl(${hue(first)} 62% 48%)`:'';
+  const open=S.preview===i.id;
+  return `<article class="card${i.done?' done':''}" data-id="${esc(i.id)}">
+    <div class="crow">
+    <span class="spine"${spine?` style="background:${spine}"`:''}></span>
+    ${S.select?`<span class="check${S.sel.has(i.id)?' on':''}"></span>`:''}
+    <div class="main">
+      <div class="row1"><span class="badge">${typeName(i.type)}</span><button class="user" data-user="${esc(i.user)}">${esc(i.user?'@'+i.user:'okänt konto')}</button><time>${fmt(dateOf(i))}</time></div>
+      ${i.note?`<p class="note">${esc(i.note)}</p>`:'<p class="note none">Ingen beskrivning än</p>'}
+      <div class="pills">${i.cats.length?i.cats.map(pill).join(''):'<span class="unsorted">Osorterad</span>'}</div>
+    </div>
+    <div class="side">
+      <button class="prev${open?' on':''}" aria-label="${open?'Dölj förhandsvisning':'Förhandsvisa klippet'}" aria-pressed="${open}">${EYE_SVG}</button>
+      <a class="open" href="${esc(i.url)}" target="_blank" rel="noopener" aria-label="Öppna i Instagram">${OPEN_SVG}</a>
+    </div>
+    </div>
+    ${open?embedHtml(i):''}
+  </article>`;
+}
+function refreshCard(id){
+  const el=document.querySelector(`.card[data-id="${CSS.escape(id)}"]`),i=S.map.get(id);
+  if(el&&i)el.outerHTML=card(i);
+}
+function renderList(){
+  const all=visible(),shown=all.slice(0,S.limit);
+  const el=$('list');
+  if(!S.items.length){
+    el.innerHTML=`<div class="empty"><h2>Samla alla dina sparade klipp</h2><p>Importera exporten från Instagram så sorterar du dem i egna kategorier och hittar tillbaka direkt.</p><button class="btn primary" id="emptyImport">Importera</button></div>`;
+  }else if(!all.length){
+    el.innerHTML=`<div class="empty"><h2>Inga träffar</h2><p>Ändra sökningen eller filtren för att se fler klipp.</p></div>`;
+  }else el.innerHTML=shown.map(card).join('');
+  const more=$('more');
+  more.hidden=all.length<=S.limit;
+  if(!more.hidden)more.innerHTML=`<button class="btn" id="moreBtn">Visa fler (${all.length-S.limit} kvar)</button>`;
+  $('count').textContent=S.items.length?(all.length===S.items.length?`${S.items.length} klipp`:`${all.length} av ${S.items.length}`):'';
+  $('selbar').hidden=!S.select;
+  $('selcount').textContent=`${S.sel.size} valda`;
+  $('btnSelect').classList.toggle('on',S.select);
+}
+function renderAll(){renderChips();renderBanner();renderList();}
+
+/* ---------- Kategorisera och redigera ---------- */
+async function toggleCat(ids,c){
+  const items=ids.map(i=>S.map.get(i)).filter(Boolean);
+  const all=items.every(i=>i.cats.includes(c));
+  items.forEach(i=>{if(all)i.cats=i.cats.filter(x=>x!==c);else if(!i.cats.includes(c))i.cats.push(c);});
+  await putItems(items);
+}
+function chipsFor(items,attr){
+  return S.cats.map(c=>{
+    const n=items.filter(i=>i.cats.includes(c)).length;
+    const st=n&&n===items.length?'on':n?'some':'';
+    return `<button class="chip ${st}" style="--h:${hue(c)}" ${attr}="${esc(c)}">${esc(c)}</button>`;
+  }).join('');
+}
+function openItem(ids){S.dlg=ids;S.dlgPrev=false;renderItemDlg();$('dItem').showModal();}
+function renderItemDlg(){
+  const items=S.dlg.map(i=>S.map.get(i)).filter(Boolean);
+  if(!items.length){$('dItem').close();return;}
+  const one=items.length===1?items[0]:null;
+  let h=`<div class="sheet-head"><h2>${one?esc(one.user?'@'+one.user:'Okänt konto'):items.length+' valda klipp'}</h2><button class="x" data-close aria-label="Stäng">✕</button></div>`;
+  if(one){
+    h+=`<p class="meta"><span class="badge">${typeName(one.type)}</span><span>${fmt(dateOf(one))}</span></p>
+    <a class="btn primary wide" href="${esc(one.url)}" target="_blank" rel="noopener">${OPEN_SVG.replace('<svg','<svg width="20" height="20" style="stroke:currentColor;fill:none;stroke-width:1.9"')} Öppna i Instagram</a>
+    <button class="btn wide" id="prevBtn" style="margin-top:8px">${S.dlgPrev?'Dölj förhandsvisning':'Visa förhandsvisning'}</button>${S.dlgPrev?embedHtml(one):''}`;
+  }
+  h+=`<h3>Kategorier</h3><div class="chips wrap">${chipsFor(items,'data-tog')}</div>
+  <div class="addcat"><input id="newCatIn" placeholder="Ny kategori" maxlength="40"><button class="btn" id="newCatBtn">Lägg till</button></div>`;
+  if(one)h+=`<h3>Beskrivning</h3><textarea id="noteIn" rows="3" placeholder="Skriv eller klistra in bildtexten, så ser du direkt vad klippet är">${esc(one.note)}</textarea>
+  <label class="check-row"><input type="checkbox" id="doneIn"${one.done?' checked':''}> Markera som klar</label>`;
+  h+=`<div class="actions"><button class="btn danger" id="delBtn">Ta bort</button><button class="btn primary" data-close>Klar</button></div>`;
+  $('itemIn').innerHTML=h;
+}
+async function addCategory(name){
+  name=name.trim();
+  if(!name)return false;
+  if(S.cats.some(c=>c.toLowerCase()===name.toLowerCase())){toast('Kategorin finns redan');return false;}
+  S.cats.push(name);await saveCats();return name;
+}
+
+/* ---------- Sorteringsläge ---------- */
+function openSort(){
+  S.queue=S.items.filter(i=>!i.cats.length).sort(sortFn).map(i=>i.id);
+  S.qi=0;
+  if(!S.queue.length){toast('Allt är redan sorterat');return;}
+  renderSort();
+  $('dSort').showModal();
+}
+function renderSort(){
+  const el=$('sortIn');
+  if(S.qi>=S.queue.length){
+    el.innerHTML=`<div class="sheet-head"><h2>Klart</h2><button class="x" data-close aria-label="Stäng">✕</button></div><p>Du har gått igenom alla osorterade klipp.</p><div class="actions"><button class="btn primary" data-close>Stäng</button></div>`;
+    return;
+  }
+  const i=S.map.get(S.queue[S.qi]);
+  if(!i){S.queue.splice(S.qi,1);renderSort();return;}
+  const pct=Math.round(S.qi/S.queue.length*100);
+  el.innerHTML=`<div class="sheet-head"><h2>${esc(i.user?'@'+i.user:'Okänt konto')}</h2><button class="x" data-close aria-label="Stäng">✕</button></div>
+  <p class="meta"><span class="badge">${typeName(i.type)}</span><span>${fmt(dateOf(i))}</span><span style="margin-left:auto">${S.qi+1} av ${S.queue.length}</span></p>
+  <div class="sortprog"><i style="width:${pct}%"></i></div>
+  <a class="btn primary wide" href="${esc(i.url)}" target="_blank" rel="noopener">${OPEN_SVG.replace('<svg','<svg width="20" height="20" style="stroke:currentColor;fill:none;stroke-width:1.9"')} Öppna i Instagram</a>
+  <button class="btn wide" id="sPrevBtn" style="margin-top:8px">${S.sortPrev?'Dölj förhandsvisning':'Visa förhandsvisning'}</button>${S.sortPrev?embedHtml(i):''}
+  <h3>Välj kategori</h3>
+  <div class="chips wrap">${chipsFor([i],'data-stog')}</div>
+  <div class="addcat"><input id="sNewCat" placeholder="Ny kategori" maxlength="40"><button class="btn" id="sNewCatBtn">Lägg till</button></div>
+  <textarea id="sNote" rows="2" style="margin-top:12px" placeholder="Beskrivning, till exempel bildtexten">${esc(i.note)}</textarea>
+  <label class="check-row"><input type="checkbox" id="sAuto"${S.auto?' checked':''}> Gå vidare automatiskt när jag väljer kategori</label>
+  <div class="actions"><button class="btn" data-sact="prev"${S.qi?'':' disabled'}>Föregående</button><button class="btn" data-sact="skip">Hoppa över</button><button class="btn danger" data-sact="del">Ta bort</button></div>`;
+}
+
+/* ---------- Kategorihantering ---------- */
+function renderCats(){
+  const cnt={};S.items.forEach(i=>i.cats.forEach(c=>cnt[c]=(cnt[c]||0)+1));
+  $('catsIn').innerHTML=`<div class="sheet-head"><h2>Kategorier</h2><button class="x" data-close aria-label="Stäng">✕</button></div>`+
+  S.cats.map((c,k)=>`<div class="catrow"><input value="${esc(c)}" data-ren="${k}" maxlength="40" aria-label="Namn"><span class="n">${cnt[c]||0}</span><button class="x" data-delcat="${k}" aria-label="Ta bort kategori">✕</button></div>`).join('')+
+  `<div class="addcat"><input id="cNew" placeholder="Ny kategori" maxlength="40"><button class="btn" id="cNewBtn">Lägg till</button></div>
+  <p style="color:var(--mute);font-size:13px">Att ta bort en kategori tar bara bort etiketten från klippen, inte klippen själva.</p>`;
+}
+
+/* ---------- Säkerhetskopia ---------- */
+function backup(){
+  const data={app:'klippbok',version:1,exported:new Date().toISOString(),categories:S.cats,items:S.items};
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:'application/json'}));
+  a.download=`klippbok-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);a.click();a.remove();
+  toast('Säkerhetskopian är sparad');
+}
+async function restore(file){
+  try{
+    const d=JSON.parse(await file.text());
+    if(d.app!=='klippbok'||!Array.isArray(d.items))throw new Error('Fel filformat');
+    (d.categories||[]).forEach(c=>{if(!S.cats.includes(c))S.cats.push(c);});
+    let n=0;const put=[];
+    d.items.forEach(it=>{
+      if(!it.id)return;
+      it.cats=it.cats||[];it.note=it.note||'';
+      const ex=S.map.get(it.id);
+      if(ex){it.cats.forEach(c=>{if(!ex.cats.includes(c))ex.cats.push(c);});if(!ex.note)ex.note=it.note;put.push(ex);}
+      else{S.items.push(it);S.map.set(it.id,it);put.push(it);n++;}
+    });
+    await putItems(put);await saveCats();
+    $('dMenu').close();renderAll();toast(`Återställde ${n} nya klipp`);
+  }catch(e){toast('Kunde inte läsa säkerhetskopian: '+(e.message||e));}
+}
+
+/* ---------- Händelser ---------- */
+let searchT;
+$('q').addEventListener('input',e=>{clearTimeout(searchT);searchT=setTimeout(()=>{S.q=e.target.value;S.limit=80;renderList();},120);});
+$('fSort').onchange=e=>{S.sort=e.target.value;renderList();};
+$('fType').onchange=e=>{S.type=e.target.value;S.limit=80;renderList();};
+$('fStatus').onchange=e=>{S.status=e.target.value;S.limit=80;renderList();};
+$('chips').addEventListener('click',e=>{const b=e.target.closest('[data-cat]');if(!b)return;S.cat=b.dataset.cat;S.limit=80;renderAll();window.scrollTo({top:0});});
+$('banner').addEventListener('click',e=>{if(e.target.id==='bannerSort')openSort();});
+$('more').addEventListener('click',()=>{S.limit+=80;renderList();});
+$('list').addEventListener('click',e=>{
+  if(e.target.closest('a.open'))return;
+  const pv=e.target.closest('.prev');
+  if(pv){
+    const id=pv.closest('.card').dataset.id,old=S.preview;
+    S.preview=old===id?null:id;
+    if(old)refreshCard(old);
+    if(S.preview)refreshCard(id);else refreshCard(id);
+    return;
+  }
+  if(e.target.id==='emptyImport'){$('dImport').showModal();return;}
+  const u=e.target.closest('.user');
+  if(u&&!S.select){const n=u.dataset.user;if(n){$('q').value=n;S.q=n;S.limit=80;renderList();window.scrollTo({top:0});}return;}
+  const c=e.target.closest('.card');if(!c)return;
+  const id=c.dataset.id;
+  if(S.select){S.sel.has(id)?S.sel.delete(id):S.sel.add(id);renderList();}
+  else openItem([id]);
+});
+function setSelect(on){S.select=on;if(!on)S.sel.clear();renderList();}
+$('btnSelect').onclick=()=>setSelect(!S.select);
+$('selCancel').onclick=()=>setSelect(false);
+$('selAll').onclick=()=>{const v=visible();if(S.sel.size===v.length)S.sel.clear();else v.forEach(i=>S.sel.add(i.id));renderList();};
+$('selCat').onclick=()=>{if(!S.sel.size){toast('Markera några klipp först');return;}openItem([...S.sel]);};
+$('btnImport').onclick=()=>$('dImport').showModal();
+$('btnMenu').onclick=()=>$('dMenu').showModal();
+
+/* Generella dialoger: stäng via knapp eller bakgrund */
+document.querySelectorAll('dialog').forEach(d=>{
+  d.addEventListener('click',e=>{if(e.target===d||e.target.closest('[data-close]'))d.close();});
+});
+$('dItem').addEventListener('close',()=>{if(S.select&&S.sel.size&&!S.map.size)S.sel.clear();renderAll();});
+$('dSort').addEventListener('close',renderAll);
+$('dCats').addEventListener('close',renderAll);
+$('dImport').addEventListener('close',renderAll);
+
+/* Objektdialog */
+$('itemIn').addEventListener('click',async e=>{
+  if(e.target.id==='prevBtn'){S.dlgPrev=!S.dlgPrev;renderItemDlg();return;}
+  const t=e.target.closest('[data-tog]');
+  if(t){await toggleCat(S.dlg,t.dataset.tog);renderItemDlg();return;}
+  if(e.target.id==='newCatBtn'){
+    const n=await addCategory($('newCatIn').value);
+    if(n){await toggleCat(S.dlg,n);renderItemDlg();}
+    return;
+  }
+  if(e.target.id==='delBtn'){
+    if(!confirm(`Ta bort ${S.dlg.length>1?S.dlg.length+' klipp':'klippet'} från Klippboken? Det påverkar inte Instagram.`))return;
+    const ids=S.dlg.slice();
+    await delItems(ids);S.items=S.items.filter(i=>!ids.includes(i.id));rebuildMap();
+    ids.forEach(i=>S.sel.delete(i));
+    $('dItem').close();toast('Borttaget');
+  }
+});
+$('itemIn').addEventListener('keydown',async e=>{
+  if(e.key==='Enter'&&e.target.id==='newCatIn'){
+    e.preventDefault();const n=await addCategory(e.target.value);
+    if(n){await toggleCat(S.dlg,n);renderItemDlg();}
+  }
+});
+let noteT;
+$('itemIn').addEventListener('input',e=>{
+  const it=S.dlg.length===1&&S.map.get(S.dlg[0]);if(!it)return;
+  if(e.target.id==='noteIn'){it.note=e.target.value;clearTimeout(noteT);noteT=setTimeout(()=>putItems([it]),300);}
+});
+$('itemIn').addEventListener('change',e=>{
+  const it=S.dlg.length===1&&S.map.get(S.dlg[0]);if(!it)return;
+  if(e.target.id==='doneIn'){it.done=e.target.checked;putItems([it]);}
+});
+
+/* Sorteringsdialog */
+$('sortIn').addEventListener('click',async e=>{
+  const id=S.queue[S.qi];
+  const t=e.target.closest('[data-stog]');
+  if(t&&id){
+    const it=S.map.get(id),had=it.cats.length>0;
+    await toggleCat([id],t.dataset.stog);
+    if(S.auto&&!had&&it.cats.length)S.qi++;
+    renderSort();return;
+  }
+  if(e.target.id==='sNewCatBtn'&&id){
+    const n=await addCategory($('sNewCat').value);
+    if(n){const it=S.map.get(id);await toggleCat([id],n);if(S.auto&&it.cats.length)S.qi++;renderSort();}
+    return;
+  }
+  if(e.target.id==='sPrevBtn'){S.sortPrev=!S.sortPrev;renderSort();return;}
+  const a=e.target.closest('[data-sact]');
+  if(a){
+    const act=a.dataset.sact;
+    if(act==='prev'&&S.qi>0)S.qi--;
+    else if(act==='skip')S.qi++;
+    else if(act==='del'&&id){
+      if(!confirm('Ta bort klippet från Klippboken?'))return;
+      await delItems([id]);S.items=S.items.filter(i=>i.id!==id);rebuildMap();S.queue.splice(S.qi,1);
+    }
+    renderSort();
+  }
+});
+$('sortIn').addEventListener('input',e=>{
+  const id=S.queue[S.qi],it=id&&S.map.get(id);
+  if(e.target.id==='sNote'&&it){it.note=e.target.value;clearTimeout(noteT);noteT=setTimeout(()=>putItems([it]),300);}
+});
+$('sortIn').addEventListener('change',e=>{if(e.target.id==='sAuto')S.auto=e.target.checked;});
+
+/* Import */
+$('fileIn').addEventListener('change',async e=>{
+  const files=[...e.target.files];e.target.value='';
+  if(files.length)await importFiles(files);
+});
+$('pasteBtn').onclick=addPasted;
+
+/* Meny */
+$('mSort').onclick=()=>{$('dMenu').close();openSort();};
+$('mCats').onclick=()=>{$('dMenu').close();renderCats();$('dCats').showModal();};
+$('mBackup').onclick=backup;
+$('restoreIn').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';if(f)restore(f);});
+$('mClear').onclick=async()=>{
+  if(!confirm('Ta bort alla klipp och kategorier från den här enheten? Spara en säkerhetskopia först om du vill kunna ångra.'))return;
+  await clearItems();S.items=[];rebuildMap();S.cats=DEFAULT_CATS.slice();await saveCats();
+  S.cat='all';$('dMenu').close();renderAll();toast('Allt är rensat');
+};
+
+/* Kategorihantering */
+$('catsIn').addEventListener('change',async e=>{
+  const k=e.target.dataset.ren;if(k==null)return;
+  const old=S.cats[+k],nn=e.target.value.trim();
+  if(!nn||nn===old){e.target.value=old;return;}
+  if(S.cats.some((c,j)=>j!==+k&&c.toLowerCase()===nn.toLowerCase())){toast('Kategorin finns redan');e.target.value=old;return;}
+  S.cats[+k]=nn;
+  const ch=[];S.items.forEach(i=>{if(i.cats.includes(old)){i.cats=i.cats.map(c=>c===old?nn:c);ch.push(i);}});
+  await putItems(ch);await saveCats();
+  if(S.cat===old)S.cat=nn;
+  renderCats();
+});
+$('catsIn').addEventListener('click',async e=>{
+  const d=e.target.closest('[data-delcat]');
+  if(d){
+    const old=S.cats[+d.dataset.delcat];
+    if(!confirm(`Ta bort kategorin ${old}? Klippen finns kvar.`))return;
+    S.cats.splice(+d.dataset.delcat,1);
+    const ch=[];S.items.forEach(i=>{if(i.cats.includes(old)){i.cats=i.cats.filter(c=>c!==old);ch.push(i);}});
+    await putItems(ch);await saveCats();
+    if(S.cat===old)S.cat='all';
+    renderCats();return;
+  }
+  if(e.target.id==='cNewBtn'){
+    if(await addCategory($('cNew').value))renderCats();
+  }
+});
+
+/* ---------- PWA ---------- */
+function makeIcon(size){
+  const c=document.createElement('canvas');c.width=c.height=size;
+  const x=c.getContext('2d'),s=size;
+  x.fillStyle='#2e5bff';x.fillRect(0,0,s,s);
+  x.fillStyle='#ffffff';
+  x.beginPath();
+  x.moveTo(s*.32,s*.2);x.lineTo(s*.68,s*.2);x.lineTo(s*.68,s*.8);x.lineTo(s*.5,s*.63);x.lineTo(s*.32,s*.8);
+  x.closePath();x.fill();
+  return c.toDataURL('image/png');
+}
+function setupPWA(){
+  try{
+    const i192=makeIcon(192),i512=makeIcon(512),base=new URL('./',location.href).href;
+    const man={name:'Klippbok',short_name:'Klippbok',start_url:base,scope:base,display:'standalone',background_color:'#eaeef3',theme_color:'#2e5bff',
+      icons:[{src:i192,sizes:'192x192',type:'image/png',purpose:'any maskable'},{src:i512,sizes:'512x512',type:'image/png',purpose:'any maskable'}]};
+    $('manifest').href=URL.createObjectURL(new Blob([JSON.stringify(man)],{type:'application/manifest+json'}));
+    $('favicon').href=i192;$('touchicon').href=i192;
+  }catch(e){}
+  if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+
+(async function init(){
+  setupPWA();
+  await loadAll();
+  renderAll();
+})();
+</script>
+</body>
+</html>
