@@ -78,6 +78,8 @@ main{padding:12px 14px;max-width:760px;margin:0 auto}
 .user{border:0;background:none;padding:0;font-weight:700;font-size:16px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 time{color:var(--mute);font-size:13px;margin-left:auto}
 .note{margin:6px 0 0;font-size:15px;line-height:1.35;color:var(--ink);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.mynote{margin:6px 0 0;font-size:14px;font-style:italic;color:var(--acc);overflow-wrap:anywhere}
+.capfull{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);border-radius:12px;padding:12px 14px;max-height:34dvh;overflow:auto;margin:0 0 12px;font-size:15px;line-height:1.4}
 .note.none{color:var(--mute);font-style:italic;font-size:14px}
 .pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .pill{font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:10px;background:hsl(var(--h) 70% 50% / var(--pill-a));color:hsl(var(--h) 60% var(--pill-l))}
@@ -202,6 +204,7 @@ details li{margin-bottom:4px}
   <textarea id="pasteIn" rows="3" placeholder="Klistra in en eller flera Instagram-länkar"></textarea>
   <div class="actions"><button class="btn" id="pasteBtn">Lägg till länkar</button><button class="btn primary" data-close>Klar</button></div>
   <div class="log" id="log" role="status"></div>
+  <button class="btn" id="diagBtn" hidden style="margin-top:10px;width:100%">Kopiera filstruktur</button>
 </div></dialog>
 
 <dialog id="dMenu"><div class="in">
@@ -290,13 +293,15 @@ function mkFromLink(str){
   const m=LINK.exec(str||'');if(!m)return null;
   const kind=m[2].toLowerCase();
   const u=m[1]&&!/^(p|reel|reels|tv|share|accounts)$/i.test(m[1])?m[1]:'';
-  return {id:m[3],type:kind==='p'?'post':'reel',user:u,url:`https://www.instagram.com/${kind==='p'?'p':'reel'}/${m[3]}/`,savedAt:null,cols:[]};
+  return {id:m[3],type:kind==='p'?'post':'reel',user:u,url:`https://www.instagram.com/${kind==='p'?'p':'reel'}/${m[3]}/`,savedAt:null,cols:[],caption:'',ownerName:''};
 }
 function addFound(map,it){
   const ex=map.get(it.id);
   if(!ex){map.set(it.id,it);return;}
   if(!ex.user&&it.user)ex.user=it.user;
   if(!ex.savedAt&&it.savedAt)ex.savedAt=it.savedAt;
+  if(!ex.caption&&it.caption)ex.caption=it.caption;
+  if(!ex.ownerName&&it.ownerName)ex.ownerName=it.ownerName;
   it.cols.forEach(c=>{if(!ex.cols.includes(c))ex.cols.push(c);});
 }
 function extract(node){
@@ -326,6 +331,8 @@ function walkJson(node,found,st){
     const it=mkFromLink(r.link);
     let user=typeof node.title==='string'?node.title.trim():'';
     if(/^(collection|collections|samling|samlingar)$/i.test(user))user='';
+    let colFromTitle='';
+    if(st.coll&&user&&r.userGuess&&user!==r.userGuess){colFromTitle=fixStr(user);user='';}
     if(!user&&r.userGuess)user=r.userGuess;
     if(!user&&Array.isArray(node.label_values)){
       const lv=node.label_values.find(x=>x&&/anv|user|owner|namn|name/i.test(x.label||'')&&typeof x.value==='string'&&x.value&&!LINK.test(x.value));
@@ -333,27 +340,94 @@ function walkJson(node,found,st){
     }
     it.user=fixStr(user)||it.user;
     it.savedAt=r.ts?(r.ts<1e12?r.ts*1000:r.ts):null;
-    if(st.collection)it.cols=[st.collection];
+    if(colFromTitle)it.cols=[colFromTitle];
+    else if(st.collection)it.cols=[st.collection];
     addFound(found,it);
     return;
   }
   for(const k of Object.keys(node))walkJson(node[k],found,st);
 }
-function parseHtml(text,found){
-  const doc=new DOMParser().parseFromString(text,'text/html');
-  doc.querySelectorAll('a[href]').forEach(a=>{
-    const it=mkFromLink(a.getAttribute('href'));if(!it)return;
-    const box=a.closest('.pam')||(a.parentElement&&a.parentElement.parentElement&&a.parentElement.parentElement.parentElement);
-    const u=box&&box.querySelector('._a6-h');
-    if(u&&u.textContent.trim())it.user=u.textContent.trim();
-    if(box){const ds=box.querySelectorAll('div');const t=ds.length?ds[ds.length-1].textContent:'';const p=Date.parse(t);if(!isNaN(p))it.savedAt=p;}
-    addFound(found,it);
-  });
+const MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,maj:4,jun:5,jul:6,aug:7,sep:8,oct:9,okt:9,nov:10,dec:11};
+function parseDate(t){
+  const m=/([A-Za-zåäö]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})(?:\s+(?:at\s+)?(\d{1,2}):(\d{2})\s*([ap]m)?)?/i.exec(t||'');
+  if(!m)return null;
+  const mo=MONTHS[m[1].slice(0,3).toLowerCase()];if(mo==null)return null;
+  let h=m[4]?+m[4]:0;const ap=(m[6]||'').toLowerCase();
+  if(ap==='pm'&&h<12)h+=12;if(ap==='am'&&h===12)h=0;
+  return new Date(+m[3],mo,+m[2],h,m[5]?+m[5]:0).getTime();
 }
-function parseText(name,text,found){
+function parseHtml(text,found,name){
+  const doc=new DOMParser().parseFromString(text,'text/html');
+  const root=doc.querySelector('main')||doc.body;
+  const isCol=/collection|samling/i.test(name||'');
+  const cell=(tbl,label)=>{
+    for(const td of tbl.querySelectorAll('td'))
+      if(td.textContent.trim()===label&&td.nextElementSibling)return td.nextElementSibling.textContent.trim();
+    return '';
+  };
+  const itemFor=a=>{
+    const it=mkFromLink(a.getAttribute('href'));if(!it)return null;
+    const tbl=a.closest('table');
+    if(tbl){
+      for(const row of tbl.rows){
+        if(row.cells.length>=2&&/^(caption|bildtext)$/i.test(row.cells[0].textContent.trim())){it.caption=row.cells[1].textContent.trim();break;}
+      }
+      const un=cell(tbl,'Username')||cell(tbl,'Användarnamn');
+      if(un)it.user=un;
+      it.ownerName=cell(tbl,'Name')||cell(tbl,'Namn');
+    }
+    return it;
+  };
+  let n=0;
+  if(isCol){
+    [...root.children].forEach(block=>{
+      const t0=block.querySelector('table');if(!t0)return;
+      const row=[...t0.rows].find(r=>r.cells.length>=2&&/^(name|namn)$/i.test(r.cells[0].textContent.trim()));
+      const colName=row?row.cells[1].textContent.trim():'';
+      block.querySelectorAll('a[href]').forEach(a=>{
+        const it=itemFor(a);if(!it)return;
+        if(colName)it.cols=[colName];
+        addFound(found,it);n++;
+      });
+    });
+  }else{
+    root.querySelectorAll('a[href]').forEach(a=>{
+      const it=itemFor(a);if(!it)return;
+      const block=a.closest('main > div');
+      const ts=block&&block.querySelector('._a6-o');
+      if(ts)it.savedAt=parseDate(ts.textContent);
+      addFound(found,it);n++;
+    });
+  }
+  return n;
+}
+function skeleton(o){
+  if(Array.isArray(o))return o.length?`[${o.length}x ${skeleton(o[0])}]`:'[]';
+  if(o&&typeof o==='object')return '{'+Object.keys(o).slice(0,12).map(k=>k+':'+skeleton(o[k])).join(', ')+'}';
+  if(typeof o==='string')return LINK.test(o)?'"<länk>"':(o===''?'""':'"text"');
+  return o===null?'null':typeof o;
+}
+function diagnose(name,data){
+  const out=[`Fil: ${name.split('/').pop()}`];
+  const arrays=Array.isArray(data)?{'(rot)':data}:Object.fromEntries(Object.entries(data||{}).filter(([,v])=>Array.isArray(v)));
+  const keys=Array.isArray(data)?[]:Object.keys(data||{});
+  if(keys.length)out.push('Nycklar: '+keys.join(', '));
+  for(const [k,arr] of Object.entries(arrays)){
+    const forms=new Map();
+    arr.slice(0,300).forEach(el=>{const f=skeleton(el);forms.set(f,(forms.get(f)||0)+1);});
+    out.push(`${k}: ${arr.length} poster`);
+    [...forms.entries()].sort((a,b)=>b[1]-a[1]).slice(0,4).forEach(([f,n])=>out.push(`  ${n}x ${f}`));
+  }
+  return out.join('\n');
+}
+function parseText(name,text,found,diag){
   const t=text.trim();
-  if(/\.html?$/i.test(name)||t.startsWith('<')){parseHtml(text,found);return;}
-  walkJson(JSON.parse(text),found,{collection:null});
+  if(/\.html?$/i.test(name)||t.startsWith('<')){const n=parseHtml(text,found,name);if(diag)diag.push(`Fil: ${name.split('/').pop()} (html, ${n} klipp)`);return n;}
+  const data=JSON.parse(text);
+  if(diag)diag.push(diagnose(name,data));
+  const before=found.size;
+  walkJson(data,found,{collection:null,coll:/collection|samling/i.test(name)});
+  return found.size-before;
 }
 
 /* ---------- Zip-läsare (utan bibliotek) ---------- */
@@ -416,7 +490,8 @@ const isSavedEntry=e=>e.usize>0&&/(^|\/)[^/]*saved[^/]*\.(json|html?)$/i.test(e.
 const logEl=()=>$('log');
 function log(m){const l=logEl();l.textContent+=(l.textContent?'\n':'')+m;l.scrollTop=l.scrollHeight;}
 async function importFiles(files){
-  logEl().textContent='';
+  logEl().textContent='';$('diagBtn').hidden=true;
+  S.diag=[];
   const found=new Map();
   for(const f of files){
     try{
@@ -425,21 +500,25 @@ async function importFiles(files){
         const cand=(await readZip(f)).filter(isSavedEntry);
         if(!cand.length){log('Hittade inga filer för sparade inlägg i zip-filen. Kontrollera att Sparat var valt vid exporten.');continue;}
         for(const e of cand){
-          const before=found.size;
-          parseText(e.name,await readEntry(f,e),found);
-          log(`${e.name.split('/').pop()}: ${found.size-before} nya länkar`);
+          const n=parseText(e.name,await readEntry(f,e),found,S.diag);
+          log(`${e.name.split('/').pop()}: ${n} klipp lästes`);
         }
       }else{
-        const before=found.size;
-        parseText(f.name,await f.text(),found);
-        log(`${f.name}: ${found.size-before} nya länkar`);
+        const n=parseText(f.name,await f.text(),found,S.diag);
+        log(`${f.name}: ${n} klipp lästes`);
       }
     }catch(err){log(`Kunde inte läsa ${f.name}: ${err.message||err}`);}
   }
   await mergeFound(found,$('optCols').checked);
+  $('diagBtn').hidden=!S.diag.length;
 }
 async function mergeFound(found,useCols){
   if(!found.size){log('Inga sparade klipp hittades.');return;}
+  const colNames=new Set();found.forEach(it=>it.cols.forEach(c=>colNames.add(c)));
+  // Orörda standardkategorier ersätts av Instagram-samlingarna
+  if(useCols&&colNames.size&&DEFAULT_CATS.every(c=>S.cats.includes(c))&&!S.items.some(i=>i.cats.some(c=>DEFAULT_CATS.includes(c)))){
+    S.cats=S.cats.filter(c=>!DEFAULT_CATS.includes(c));
+  }
   let added=0,updated=0,newCats=0;const put=[];
   for(const it of found.values()){
     const cats=[];
@@ -448,17 +527,25 @@ async function mergeFound(found,useCols){
     if(ex){
       let ch=false;
       cats.forEach(c=>{if(!ex.cats.includes(c)){ex.cats.push(c);ch=true;}});
-      if(!ex.user&&it.user){ex.user=it.user;ch=true;}
-      if(!ex.savedAt&&it.savedAt){ex.savedAt=it.savedAt;ch=true;}
+      if(it.user&&ex.user!==it.user){ex.user=it.user;ch=true;}
+      if(it.savedAt&&ex.savedAt!==it.savedAt){ex.savedAt=it.savedAt;ch=true;}
+      if(it.caption&&ex.caption!==it.caption){ex.caption=it.caption;ch=true;}
+      if(it.ownerName&&ex.ownerName!==it.ownerName){ex.ownerName=it.ownerName;ch=true;}
       if(ch){put.push(ex);updated++;}
     }else{
-      const n={id:it.id,type:it.type,url:it.url,user:it.user,savedAt:it.savedAt,addedAt:Date.now(),cats,note:'',done:false};
+      const n={id:it.id,type:it.type,url:it.url,user:it.user,ownerName:it.ownerName||'',caption:it.caption||'',savedAt:it.savedAt,addedAt:Date.now(),cats,note:'',done:false};
       S.items.push(n);S.map.set(n.id,n);put.push(n);added++;
     }
   }
   await putItems(put);
-  if(newCats)await saveCats();
-  log(`Klart. ${found.size} klipp hittades: ${added} nya, ${found.size-added-updated} fanns redan${updated?`, ${updated} uppdaterades`:''}.${newCats?` ${newCats} kategorier skapades från samlingar.`:''}`);
+  await saveCats();
+  log(`Klart. ${found.size} unika klipp: ${added} nya, ${updated} uppdaterades med bildtext, konto eller samling, ${found.size-added-updated} var oförändrade.`);
+  if(colNames.size){
+    const list=[...colNames];
+    log(`${list.length} samlingar hittades${useCols?' och blev kategorier':''}: ${list.slice(0,10).join(', ')}${list.length>10?' med flera':''}.`);
+  }else if(useCols){
+    log('Inga samlingar hittades i filerna. Är samlingsfilen med i exporten? Annars sorterar du själv med Sortera osorterade i menyn.');
+  }
   renderAll();
 }
 async function addPasted(){
@@ -486,7 +573,7 @@ function visible(){
     if(S.status==='open'&&i.done)return false;
     if(S.status==='done'&&!i.done)return false;
     if(words.length){
-      const h=(i.user+' '+i.note+' '+i.cats.join(' ')+' '+i.id).toLowerCase();
+      const h=((i.user||'')+' '+(i.ownerName||'')+' '+(i.caption||'')+' '+i.note+' '+i.cats.join(' ')+' '+i.id).toLowerCase();
       if(!words.every(w=>h.includes(w)))return false;
     }
     return true;
@@ -499,7 +586,7 @@ function renderChips(){
   S.items.forEach(i=>i.cats.forEach(c=>cnt[c]=(cnt[c]||0)+1));
   const chip=(v,label,n,h)=>`<button class="chip${S.cat===v?' active':''}" data-cat="${esc(v)}"${h!=null?` style="--h:${h}"`:''}>${esc(label)} <small>${n}</small></button>`;
   let h=chip('all','Alla',S.items.length)+chip('__none','Osorterade',none);
-  S.cats.forEach(c=>{h+=chip(c,c,cnt[c]||0,hue(c));});
+  [...S.cats].sort((a,b)=>(cnt[b]||0)-(cnt[a]||0)||a.localeCompare(b,'sv')).forEach(c=>{h+=chip(c,c,cnt[c]||0,hue(c));});
   $('chips').innerHTML=h;
 }
 function renderBanner(){
@@ -518,7 +605,8 @@ function card(i){
     ${S.select?`<span class="check${S.sel.has(i.id)?' on':''}"></span>`:''}
     <div class="main">
       <div class="row1"><span class="badge">${typeName(i.type)}</span><button class="user" data-user="${esc(i.user)}">${esc(i.user?'@'+i.user:'okänt konto')}</button><time>${fmt(dateOf(i))}</time></div>
-      ${i.note?`<p class="note">${esc(i.note)}</p>`:'<p class="note none">Ingen beskrivning än</p>'}
+      ${i.caption?`<p class="note">${esc(i.caption)}</p>`:(i.note?'':'<p class="note none">Ingen bildtext</p>')}
+      ${i.note?`<p class="mynote">${esc(i.note)}</p>`:''}
       <div class="pills">${i.cats.length?i.cats.map(pill).join(''):'<span class="unsorted">Osorterad</span>'}</div>
     </div>
     <div class="side">
@@ -572,13 +660,14 @@ function renderItemDlg(){
   const one=items.length===1?items[0]:null;
   let h=`<div class="sheet-head"><h2>${one?esc(one.user?'@'+one.user:'Okänt konto'):items.length+' valda klipp'}</h2><button class="x" data-close aria-label="Stäng">✕</button></div>`;
   if(one){
-    h+=`<p class="meta"><span class="badge">${typeName(one.type)}</span><span>${fmt(dateOf(one))}</span></p>
+    h+=`<p class="meta"><span class="badge">${typeName(one.type)}</span><span>${fmt(dateOf(one))}</span>${one.ownerName?`<span>${esc(one.ownerName)}</span>`:''}</p>
+    ${one.caption?`<div class="capfull">${esc(one.caption)}</div>`:''}
     <a class="btn primary wide" href="${esc(one.url)}" target="_blank" rel="noopener">${OPEN_SVG.replace('<svg','<svg width="20" height="20" style="stroke:currentColor;fill:none;stroke-width:1.9"')} Öppna i Instagram</a>
     <button class="btn wide" id="prevBtn" style="margin-top:8px">${S.dlgPrev?'Dölj förhandsvisning':'Visa förhandsvisning'}</button>${S.dlgPrev?embedHtml(one):''}`;
   }
   h+=`<h3>Kategorier</h3><div class="chips wrap">${chipsFor(items,'data-tog')}</div>
   <div class="addcat"><input id="newCatIn" placeholder="Ny kategori" maxlength="40"><button class="btn" id="newCatBtn">Lägg till</button></div>`;
-  if(one)h+=`<h3>Beskrivning</h3><textarea id="noteIn" rows="3" placeholder="Skriv eller klistra in bildtexten, så ser du direkt vad klippet är">${esc(one.note)}</textarea>
+  if(one)h+=`<h3>Egen anteckning</h3><textarea id="noteIn" rows="2" placeholder="Valfritt, till exempel varför du sparade klippet">${esc(one.note)}</textarea>
   <label class="check-row"><input type="checkbox" id="doneIn"${one.done?' checked':''}> Markera som klar</label>`;
   h+=`<div class="actions"><button class="btn danger" id="delBtn">Ta bort</button><button class="btn primary" data-close>Klar</button></div>`;
   $('itemIn').innerHTML=h;
@@ -608,14 +697,15 @@ function renderSort(){
   if(!i){S.queue.splice(S.qi,1);renderSort();return;}
   const pct=Math.round(S.qi/S.queue.length*100);
   el.innerHTML=`<div class="sheet-head"><h2>${esc(i.user?'@'+i.user:'Okänt konto')}</h2><button class="x" data-close aria-label="Stäng">✕</button></div>
-  <p class="meta"><span class="badge">${typeName(i.type)}</span><span>${fmt(dateOf(i))}</span><span style="margin-left:auto">${S.qi+1} av ${S.queue.length}</span></p>
+  <p class="meta"><span class="badge">${typeName(i.type)}</span><span>${fmt(dateOf(i))}</span>${i.ownerName?`<span>${esc(i.ownerName)}</span>`:''}<span style="margin-left:auto">${S.qi+1} av ${S.queue.length}</span></p>
   <div class="sortprog"><i style="width:${pct}%"></i></div>
+  ${i.caption?`<div class="capfull">${esc(i.caption)}</div>`:'<p class="note none">Ingen bildtext. Använd förhandsvisningen för att se klippet.</p>'}
   <a class="btn primary wide" href="${esc(i.url)}" target="_blank" rel="noopener">${OPEN_SVG.replace('<svg','<svg width="20" height="20" style="stroke:currentColor;fill:none;stroke-width:1.9"')} Öppna i Instagram</a>
   <button class="btn wide" id="sPrevBtn" style="margin-top:8px">${S.sortPrev?'Dölj förhandsvisning':'Visa förhandsvisning'}</button>${S.sortPrev?embedHtml(i):''}
   <h3>Välj kategori</h3>
   <div class="chips wrap">${chipsFor([i],'data-stog')}</div>
   <div class="addcat"><input id="sNewCat" placeholder="Ny kategori" maxlength="40"><button class="btn" id="sNewCatBtn">Lägg till</button></div>
-  <textarea id="sNote" rows="2" style="margin-top:12px" placeholder="Beskrivning, till exempel bildtexten">${esc(i.note)}</textarea>
+  <textarea id="sNote" rows="2" style="margin-top:12px" placeholder="Egen anteckning (valfritt)">${esc(i.note)}</textarea>
   <label class="check-row"><input type="checkbox" id="sAuto"${S.auto?' checked':''}> Gå vidare automatiskt när jag väljer kategori</label>
   <div class="actions"><button class="btn" data-sact="prev"${S.qi?'':' disabled'}>Föregående</button><button class="btn" data-sact="skip">Hoppa över</button><button class="btn danger" data-sact="del">Ta bort</button></div>`;
 }
@@ -648,7 +738,7 @@ async function restore(file){
       if(!it.id)return;
       it.cats=it.cats||[];it.note=it.note||'';
       const ex=S.map.get(it.id);
-      if(ex){it.cats.forEach(c=>{if(!ex.cats.includes(c))ex.cats.push(c);});if(!ex.note)ex.note=it.note;put.push(ex);}
+      if(ex){it.cats.forEach(c=>{if(!ex.cats.includes(c))ex.cats.push(c);});if(!ex.note)ex.note=it.note;if(!ex.caption&&it.caption)ex.caption=it.caption;put.push(ex);}
       else{S.items.push(it);S.map.set(it.id,it);put.push(it);n++;}
     });
     await putItems(put);await saveCats();
@@ -774,6 +864,11 @@ $('fileIn').addEventListener('change',async e=>{
   if(files.length)await importFiles(files);
 });
 $('pasteBtn').onclick=addPasted;
+$('diagBtn').onclick=async()=>{
+  const txt=S.diag.join('\n\n');
+  try{await navigator.clipboard.writeText(txt);toast('Filstrukturen är kopierad');}
+  catch(e){logEl().textContent=txt;toast('Markera och kopiera texten i rutan');}
+};
 
 /* Meny */
 $('mSort').onclick=()=>{$('dMenu').close();openSort();};
